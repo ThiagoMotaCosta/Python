@@ -4,4 +4,7 @@ Repositório com o objetivo de dar visibilidade a habilidades em linguagem Pytho
 Cada pasta separada nesse repositório, tem trabalho voltado a esse assunto.
 Entre as bibliotecas mais utilizadas: Selenium para automação em ambiente WEB, Regex para captura de padrão de dados em documentos, Pandas para análise dos dados, Scikit-Learn para análise preditiva dos dados, entre outras ...
 
+**Modelos disponíveis:**<br>
+- [Case: Financeira - Análise Risco](analise_dados/README.md) [Agrupamento, Classificação, Métricas]
+
 <img width='150' height='150' src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg" alt='Python'/>
