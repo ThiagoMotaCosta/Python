@@ -1,20 +1,26 @@
-import pandas as pd # Análise de Dados
-import numpy as np # Calculo Numérico
-from IPython.display import display, HTML # Visualização no notebook
-
-# =====================================================================================================================
-# 0) IMPORTE DA BASE
-# =====================================================================================================================
+import pandas as pd
+import numpy as np
+from IPython.display import display, HTML
 
 # Importando a base
-base = pd.read_excel(r"caminho_excel\base_transacao_financeira.xlsx")
+base = pd.read_excel(r"caminho_pasta\base_transacao_financeira_anonimizada.xlsx")
+
+# =====================================================================================================================
+# 1) ANÁLISE EXPLORATÓRIA [ ENTENDIMENTO DOS DADOS ]
+# =====================================================================================================================
+
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+
+display(base)
+
+# =====================================================================================================================
+# 1.1) VISÃO GERAL POR LOTE [ Agrupamento por Lote e dentro dele agregação em Documentos Únicos e soma de valor líquido ]
+# =====================================================================================================================
 
 # Garante tipos corretos
 base['Valor Líquido'] = pd.to_numeric(base['Valor Líquido'], errors='coerce')
 
-# =====================================================================================================================
-# 1) VISÃO GERAL POR LOTE [ Agrupamento por Lote e dentro dele agregação em Documentos Únicos e soma de valor líquido ]
-# =====================================================================================================================
 df_base = (
     base.groupby('Lote')
         .agg(
@@ -27,6 +33,12 @@ df_base = (
 df_base['Ticket_Medio'] = round(
     df_base['Soma_Valor_Liquido'] / df_base['Qtd_Clientes'], 2
 )
+
+# =====================================================================================================================
+# 1.2) ANÁLISE EXPLORATÓRIA [ ENTENDIMENTO DOS DADOS ]
+# =====================================================================================================================
+
+display(df_base)
 
 # ====================================================================================================================
 # 2) SOMA POR DOCUMENTO [ Dentro de cada lote, soma dos valores líquidos para cada documento ]
@@ -70,13 +82,13 @@ def formato_percentual(x):
 # ================================================================================================================
 # MÉTRICA [ Objetivo verificar o peso de um documento dentro do lote para classificação de risco ]
 # ================================================================================================================
-visao['% Cliente no Lote'] = (visao['Valor Max/Documento'] / visao['Ticket Médio'] - 1)
+visao['% Cliente no Lote'] = (visao['Valor Max/Documento'] / visao['Soma Valor Líquido'])
 
 # ================================================================================================================
 # CLASSIFICAÇÃO DE RISCO [ Classificação de suspeito de acordo com a regra de negócio ]
 # ================================================================================================================
 visao['Risco'] = np.where(
-    visao['% Cliente no Lote'] > 0.10,
+    (visao['% Cliente no Lote'] > 0.10) | (visao['Qtd Clientes'] < 10),
     'Suspeito',
     'Não Suspeito'
 )
