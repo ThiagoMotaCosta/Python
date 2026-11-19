@@ -17,6 +17,44 @@ Criar um **score de suspeita** para cada aviso, calculado no momento do registro
 2. permita escolher um ponto de corte com base em custo (fraude paga × investigação desnecessária);
 3. explique cada alerta (SHAP), para o analista saber por onde começar a investigação.
 
+## Modelo
+📓 **Notebook completo:** [`fraude_auto_claims.ipynb`](fraude_auto_claims.ipynb). Ele segue o CRISP-DM: entendimento do negócio, exploração, preparação, modelagem, avaliação de custo e SHAP.
+
+### Como o modelo foi escolhido
+1. **Separação temporal:** treino com avisos de jan–nov/2025 e teste com dez/2025, que o modelo nunca viu. Assim o teste simula o uso real: treinar no passado e prever o mês seguinte.
+2. **Cinco candidatos**, do mais simples ao mais complexo. O Dummy serve de piso: um modelo que não supera ele não aprendeu nada.
+
+| Modelo | Como os hiperparâmetros foram definidos |
+|---|---|
+| Dummy (proporção da base) | Referência, sem ajuste |
+| Árvore de Decisão | `max_depth` de 1 a 10, escolhido pela validação cruzada → **7** |
+| Random Forest (`class_weight='balanced'`) | `min_samples_leaf` em 7 valores, escolhido pela validação cruzada → **50** |
+| XGBoost | GridSearch com 36 combinações (profundidade, taxa de aprendizado, nº de árvores, `min_child_weight`) |
+| LightGBM | GridSearch com 48 combinações (folhas, taxa de aprendizado, nº de árvores, `min_child_samples`) |
+
+   Toda a escolha de hiperparâmetros usa **só o treino**, com validação cruzada estratificada de 5 partes. O desbalanceamento (3% de fraude) é compensado com `scale_pos_weight` / `class_weight`.
+3. **Variáveis sensíveis:** os cinco modelos foram treinados **com e sem** idade e UF do segurado. A diferença de ROC AUC ficou abaixo de 0,005, então a versão final **não usa** essas variáveis (LGPD e risco de discriminação).
+4. **Métricas técnicas** (versão sem variáveis sensíveis):
+
+| Modelo | ROC AUC validação cruzada | ROC AUC teste | PR AUC teste |
+|---|---|---|---|
+| **LightGBM** | 0,873 | **0,870** | **0,263** |
+| XGBoost | 0,873 | 0,866 | 0,260 |
+| Random Forest | 0,865 | 0,863 | 0,232 |
+| Árvore de Decisão | 0,820 | 0,846 | 0,203 |
+| Dummy | 0,500 | 0,500 | 0,033 |
+
+   A acurácia **não** serve para escolher: o Dummy, que nunca aponta fraude, acerta 96,7%.
+5. **Critério de decisão: custo em reais.** Para os três finalistas, testamos os limiares de 0,01 a 0,99 e calculamos o custo de cada um (fraudes pagas × R\$ 20.600 + perícias × R\$ 700). Vence o modelo com o menor custo no seu melhor limiar.
+
+| Posição | Modelo | Limiar | Custo mensal | Diferença vs. 1º | Peritos necessários |
+|---|---|---|---|---|---|
+| **1º** | **LightGBM** | 0,54 | **R\$ 1,44 mi** | — | 35 |
+| 2º | XGBoost | 0,49 | R\$ 1,51 mi | +4,8% | 40 |
+| 3º | Random Forest | 0,55 | R\$ 1,53 mi | +6,1% | 33 |
+
+**Modelo escolhido: LightGBM** (`num_leaves=7`, `learning_rate=0.03`, `n_estimators=300`, `min_child_samples=20`). Na validação cruzada, XGBoost e LightGBM empataram. No teste, o LightGBM teve a melhor ROC AUC e a melhor PR AUC e, principalmente, o **menor custo**, precisando de 5 peritos a menos que o XGBoost. Árvores rasas (7 folhas) com aprendizado lento deixam o modelo menos sujeito a decorar o treino.
+
 ## Resultado
 Avaliação em **dados nunca vistos**: avisos de dezembro/2025 (4.719 avisos, 156 fraudes). O modelo escolhido é o **LightGBM**, sem as variáveis sensíveis (idade e UF). Ele teve **ROC AUC 0,87** e PR AUC 0,26, cerca de 8 vezes a taxa de fraude da base (3,3%).
 Premissas de custo: perícia = R\$ 700; fraude paga = R\$ 20.600 (valor médio pedido nas fraudes).
